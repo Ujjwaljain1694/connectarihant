@@ -4,6 +4,7 @@ const Client = require('./Client');
 const Holding = require('./Holding');
 const Position = require('./Position');
 const OTP = require('./OTP');
+const TrialBalance = require('./TrialBalance');
 
 // Associations
 Manager.hasMany(Client, { foreignKey: 'manager_id', as: 'clients' });
@@ -15,4 +16,4 @@ Holding.belongsTo(Client, { foreignKey: 'client_code', targetKey: 'client_code',
 Client.hasMany(Position, { foreignKey: 'client_code', sourceKey: 'client_code', as: 'positions' });
 Position.belongsTo(Client, { foreignKey: 'client_code', targetKey: 'client_code', as: 'client' });
 
-module.exports = { sequelize, Manager, Client, Holding, Position, OTP };
+module.exports = { sequelize, Manager, Client, Holding, Position, OTP, TrialBalance };

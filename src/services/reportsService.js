@@ -1,11 +1,13 @@
-const { Holding, Position, Client } = require('../models');
+const { Holding, Position, Client, TrialBalance } = require('../models');
 const { Op } = require('sequelize');
+const convertDate = require("../utils/formatDate"); // ✅ NEW
+
 
 /**
- * Get all holdings for a manager's clients, optionally filtered by client_code
+ * ================= HOLDINGS =================
  */
 const getHoldings = async (manager_id, client_code = null, date = null) => {
-  // First, get all client_codes belonging to this manager
+
   const clientWhere = { manager_id };
   if (client_code) clientWhere.client_code = client_code;
 
@@ -18,6 +20,7 @@ const getHoldings = async (manager_id, client_code = null, date = null) => {
 
   const clientCodeMap = {};
   clients.forEach((c) => { clientCodeMap[c.client_code] = c.client_name; });
+
   const clientCodes = Object.keys(clientCodeMap);
 
   const holdingWhere = { client_code: { [Op.in]: clientCodes } };
@@ -44,64 +47,310 @@ const getHoldings = async (manager_id, client_code = null, date = null) => {
   }));
 };
 
-/**
- * Get positions for a manager's clients
- * @param {string} manager_id
- * @param {string} type - 'open' | 'global' | 'fo_global'
- * @param {string|null} client_code
- */
-const getPositions = async (manager_id, type, client_code = null) => {
-  const typeMap = {
-    open: 'Open',
-    global: 'Global',
-    fo_global: 'FO_Global',
-  };
 
-  const mappedType = typeMap[type?.toLowerCase()];
-  if (!mappedType) {
-    throw { status: 400, message: 'Invalid position type. Use: open, global, or fo_global.' };
+/**
+ * ================= HOLDINGS REPORT (WITH PAGINATION) =================
+ */
+const getHoldingsReport = async (manager_id, query) => {
+  const {
+    datefrom,
+    Search,
+    SearchType,
+    size = 50,
+    pageNumber = 0,
+  } = query;
+
+  if (!datefrom) {
+    throw new Error("datefrom is required");
   }
 
-  const clientWhere = { manager_id };
-  if (client_code) clientWhere.client_code = client_code;
+  // ✅ convert date
+  const formattedDate = convertDate(datefrom);
+
+  // Step 1: get manager clients
+  const clients = await Client.findAll({
+    where: { manager_id },
+    attributes: ["client_code"],
+  });
+
+  let clientCodes = clients.map(c => c.client_code);
+
+  // ✅ search filter (like Clientcode)
+  if (SearchType === "Clientcode" && Search) {
+    clientCodes = [Search];
+  }
+
+  // Step 2: where condition
+  const where = {
+    client_code: {
+      [Op.in]: clientCodes,
+    },
+    date: formattedDate,
+  };
+
+  // Step 3: pagination
+  const limit = parseInt(size);
+  const offset = pageNumber * limit;
+
+  const { count, rows } = await Holding.findAndCountAll({
+    where,
+    limit,
+    offset,
+  });
+
+  // ✅ total stock value
+  const totalValue = rows.reduce(
+    (sum, item) => sum + parseFloat(item.stock_value || 0),
+    0
+  );
+
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / limit),
+    rowsPerPage: limit,
+    TotalStockValue: totalValue.toFixed(2),
+    result1: rows,
+  };
+};
+
+
+/**
+ * ================= OPEN POSITION =================
+ * ❌ NO DATE FILTER
+ */
+const getOpenPosition = async (manager_id, query) => {
+
+  const { Search, SearchType, size = 50, pageNumber = 0 } = query;
 
   const clients = await Client.findAll({
-    where: clientWhere,
+    where: { manager_id },
     attributes: ['client_code', 'client_name'],
   });
 
   if (!clients.length) return [];
 
   const clientCodeMap = {};
-  clients.forEach((c) => { clientCodeMap[c.client_code] = c.client_name; });
-  const clientCodes = Object.keys(clientCodeMap);
+  clients.forEach(c => clientCodeMap[c.client_code] = c.client_name);
 
-  const positions = await Position.findAll({
+  let clientCodes = Object.keys(clientCodeMap);
+
+  if (SearchType === "Clientcode" && Search) {
+    clientCodes = [Search];
+  }
+
+  const limit = parseInt(size);
+  const offset = pageNumber * limit;
+
+  const { count, rows } = await Position.findAndCountAll({
     where: {
       client_code: { [Op.in]: clientCodes },
-      position_type: mappedType,
+      position_type: "Open",
     },
-    order: [['client_code', 'ASC'], ['script_name', 'ASC']],
+    limit,
+    offset,
   });
 
-  return positions.map((p) => ({
-    clientName: clientCodeMap[p.client_code] || p.client_code,
-    clientCode: p.client_code,
-    positionType: p.position_type,
-    scriptName: p.script_name,
-    scriptCode: p.script_code,
-    exchange: p.exchange,
-    product: p.product,
-    buyQty: parseFloat(p.buy_qty),
-    sellQty: parseFloat(p.sell_qty),
-    netQty: parseFloat(p.net_qty),
-    buyAvg: parseFloat(p.buy_avg),
-    sellAvg: parseFloat(p.sell_avg),
-    ltp: parseFloat(p.ltp),
-    value: parseFloat(p.value),
-    pnl: parseFloat(p.pnl),
-    date: p.date,
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / limit),
+    rowsPerPage: limit,
+    userList: rows.map(p => ({
+      clientName: clientCodeMap[p.client_code] || p.client_code,
+      clientCode: p.client_code,
+      scriptName: p.script_name,
+      exchange: p.exchange,
+      buyQty: parseFloat(p.buy_qty),
+      sellQty: parseFloat(p.sell_qty),
+      netQty: parseFloat(p.net_qty),
+      pnl: parseFloat(p.pnl),
+      date: p.date,
+    }))
+  };
+};
+
+
+/**
+ * ================= GLOBAL POSITION =================
+ * ✅ DATE RANGE REQUIRED
+ */
+const getGlobalPosition = async (manager_id, query) => {
+
+  const { datefrm, dateTo, Search, SearchType, size = 50, pageNumber = 0 } = query;
+
+  if (!datefrm || !dateTo) {
+    throw { status: 400, message: "datefrm and dateTo are required" };
+  }
+
+  const fromDate = convertDate(datefrm);
+  const toDate = convertDate(dateTo);
+
+  if (new Date(fromDate) > new Date(toDate)) {
+    throw { status: 400, message: "datefrm cannot be greater than dateTo" };
+  }
+
+  const clients = await Client.findAll({
+    where: { manager_id },
+    attributes: ['client_code', 'client_name'],
+  });
+
+  if (!clients.length) return [];
+
+  const clientCodeMap = {};
+  clients.forEach(c => clientCodeMap[c.client_code] = c.client_name);
+
+  let clientCodes = Object.keys(clientCodeMap);
+
+  if (SearchType === "Clientcode" && Search) {
+    clientCodes = [Search];
+  }
+
+  const limit = parseInt(size);
+  const offset = pageNumber * limit;
+
+  const { count, rows } = await Position.findAndCountAll({
+    where: {
+      client_code: { [Op.in]: clientCodes },
+      position_type: "Global",
+      date: {
+        [Op.between]: [fromDate, toDate],
+      },
+    },
+    limit,
+    offset,
+  });
+
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / limit),
+    rowsPerPage: limit,
+    result1: rows,
+  };
+};
+
+
+/**
+ * ================= FO GLOBAL POSITION =================
+ * ✅ DATE RANGE REQUIRED
+ */
+const getFoGlobalPosition = async (manager_id, query) => {
+
+  const { datefrm, dateTo, Search, SearchType, size = 50, pageNumber = 0 } = query;
+
+  if (!datefrm || !dateTo) {
+    throw { status: 400, message: "datefrm and dateTo are required" };
+  }
+
+  const fromDate = convertDate(datefrm);
+  const toDate = convertDate(dateTo);
+
+  if (new Date(fromDate) > new Date(toDate)) {
+    throw { status: 400, message: "datefrm cannot be greater than dateTo" };
+  }
+
+  const clients = await Client.findAll({
+    where: { manager_id },
+    attributes: ['client_code', 'client_name'],
+  });
+
+  if (!clients.length) return [];
+
+  const clientCodeMap = {};
+  clients.forEach(c => clientCodeMap[c.client_code] = c.client_name);
+
+  let clientCodes = Object.keys(clientCodeMap);
+
+  if (SearchType === "Clientcode" && Search) {
+    clientCodes = [Search];
+  }
+
+  const limit = parseInt(size);
+  const offset = pageNumber * limit;
+
+  const { count, rows } = await Position.findAndCountAll({
+    where: {
+      client_code: { [Op.in]: clientCodes },
+      position_type: "FO_Global",
+      date: {
+        [Op.between]: [fromDate, toDate],
+      },
+    },
+    limit,
+    offset,
+  });
+
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / limit),
+    rowsPerPage: limit,
+    result1: rows,
+  };
+};
+
+
+/**
+ * ================= TRIAL BALANCE =================
+ */
+const getTrialBalance = async (manager_id) => {
+  const clients = await Client.findAll({
+    where: { manager_id },
+    attributes: ['client_code', 'client_name']
+  });
+
+  if (!clients.length) return [];
+
+  const clientCodes = clients.map(c => c.client_code);
+
+  const trialData = await TrialBalance.findAll({
+    where: {
+      client_code: { [Op.in]: clientCodes }
+    }
+  });
+
+  return clients.map(client => {
+    const tb = trialData.find(t => t.client_code === client.client_code);
+
+    return {
+      clientName: client.client_name,
+      clientCode: client.client_code,
+      openDebit: tb ? parseFloat(tb.open_debit || 0) : 0,
+      openCredit: tb ? parseFloat(tb.open_credit || 0) : 0,
+      netDebit: tb ? parseFloat(tb.net_debit || 0) : 0,
+      netCredit: tb ? parseFloat(tb.net_credit || 0) : 0,
+    };
+  });
+};
+
+
+/**
+ * ================= CLIENT MIS =================
+ */
+const getClientMIS = async (manager_id) => {
+  const clients = await Client.findAll({
+    where: { manager_id },
+    attributes: ['client_code', 'client_name', 'pan', 'mobile', 'email']
+  });
+
+  if (!clients.length) return [];
+
+  return clients.map(client => ({
+    clientCode: client.client_code,
+    clientName: client.client_name,
+    pan: client.pan || 'N/A',
+    mobile: client.mobile || 'N/A',
+    email: client.email || 'N/A'
   }));
 };
 
-module.exports = { getHoldings, getPositions };
+
+/**
+ * ================= EXPORT =================
+ */
+module.exports = {
+  getHoldings,
+  getHoldingsReport,   // ✅ NEW
+  getOpenPosition,
+  getGlobalPosition,
+  getFoGlobalPosition,
+  getTrialBalance,
+  getClientMIS
+};
