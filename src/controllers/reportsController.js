@@ -180,13 +180,67 @@ const getClientMIS = async (req, res, next) => {
 };
 
 
+// ================= CAPITAL BROKERAGE =================
+const getCapitalBrokerage = async (req, res, next) => {
+  try {
+    const { manager_id } = req.manager;
+
+    const data = await reportsService.getCapitalBrokerage(
+      manager_id,
+      req.query
+    );
+
+    return sendSuccess(res, data, "brokerage reports");
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+// ================= THIRD PARTY BROKERAGE =================
+const getThirdPartyBrokerage = async (req, res, next) => {
+  try {
+    const { manager_id } = req.manager;
+
+    const data = await reportsService.getThirdPartyBrokerage(
+      manager_id,
+      req.query
+    );
+
+    return sendSuccess(res, data, "Details !!!");
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+// ================= RESEARCH BROKERAGE =================
+const getResearchBrokerage = async (req, res, next) => {
+  try {
+    const { manager_id } = req.manager;
+
+    const data = await reportsService.getResearchBrokerage(
+      manager_id,
+      req.query
+    );
+
+    return sendSuccess(res, data, "Research report");
+  } catch (err) {
+    next(err);
+  }
+};
+
+
 module.exports = {
   getHoldings,
-  getHoldingsReport,   // ✅ NEW
-  getPositions,        // old
+  getHoldingsReport,
+  getPositions,
   getOpenPosition,
   getGlobalPosition,
   getFoGlobalPosition,
   getTrialBalance,
   getClientMIS,
+  getCapitalBrokerage,
+  getThirdPartyBrokerage,
+  getResearchBrokerage,
 };

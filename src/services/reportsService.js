@@ -1,4 +1,4 @@
-const { Holding, Position, Client, TrialBalance } = require('../models');
+const { Holding, Position, Client, TrialBalance, Brokerage, ThirdParty, Research } = require('../models');
 const { Op } = require('sequelize');
 const convertDate = require("../utils/formatDate"); // ✅ NEW
 
@@ -343,14 +343,154 @@ const getClientMIS = async (manager_id) => {
 
 
 /**
+ * ================= CAPITAL BROKERAGE =================
+ */
+const getCapitalBrokerage = async (manager_id, query) => {
+  const {
+    datefrom,
+    dateTo,
+    Search,
+    SearchType,
+    size = 50,
+    pageNumber = 0,
+  } = query;
+
+  if (!datefrom || !dateTo) {
+    throw { status: 400, message: "datefrom and dateTo are required" };
+  }
+
+  const clients = await Client.findAll({
+    where: { manager_id },
+    attributes: ["client_code", "client_name"],
+  });
+
+  let clientCodes = clients.map(c => c.client_code);
+
+  if (SearchType === "Clientcode" && Search) {
+    clientCodes = [Search];
+  }
+
+  const limit = parseInt(size);
+  const offset = pageNumber * limit;
+
+  const { count, rows } = await Brokerage.findAndCountAll({
+    where: {
+      client_code: { [Op.in]: clientCodes },
+      type: "CAPITAL",
+      date: {
+        [Op.between]: [convertDate(datefrom), convertDate(dateTo)],
+      },
+    },
+    limit,
+    offset,
+  });
+
+  let totalTurnover = 0;
+  let totalBrokerage = 0;
+
+  rows.forEach(r => {
+    totalTurnover += parseFloat(r.turnover || 0);
+    totalBrokerage += parseFloat(r.brokerage || 0);
+  });
+
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / limit),
+    rowsPerPage: limit,
+    totalTurnover,
+    totalBrokerage,
+    userList: rows,
+  };
+};
+
+
+/**
+ * ================= THIRD PARTY BROKERAGE =================
+ */
+const getThirdPartyBrokerage = async (manager_id, query) => {
+  const { fromDate, ToDate, size = 50, pageNumber = 0 } = query;
+
+  if (!fromDate || !ToDate) {
+    throw { status: 400, message: "fromDate and ToDate are required" };
+  }
+
+  const convertDate = (dateStr) => {
+    const [day, month, year] = dateStr.split('-');
+    return `${year}-${month}-${day}`;
+  };
+
+  const from = convertDate(fromDate);
+  const to = convertDate(ToDate);
+
+  const limit = parseInt(size);
+  const offset = pageNumber * limit;
+
+  const { count, rows } = await ThirdParty.findAndCountAll({
+    where: {
+      manager_id,
+      date: {
+        [Op.between]: [
+          new Date(`${from} 00:00:00`),
+          new Date(`${to} 23:59:59`)
+        ]
+      }
+    },
+    limit,
+    offset,
+  });
+
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / limit),
+    rowsPerPage: limit,
+    resultlist: rows,
+  };
+};
+
+
+/**
+ * ================= RESEARCH BROKERAGE =================
+ */
+const getResearchBrokerage = async (manager_id, query) => {
+  const { TradeDate, size = 50, pageNumber = 0 } = query;
+
+  if (!TradeDate) {
+    throw { status: 400, message: "TradeDate is required" };
+  }
+
+  const limit = parseInt(size);
+  const offset = pageNumber * limit;
+
+  const { count, rows } = await Research.findAndCountAll({
+    where: {
+      manager_id,
+      date: convertDate(TradeDate),
+    },
+    limit,
+    offset,
+  });
+
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / limit),
+    rowsPerPage: limit,
+    resultlist: rows,
+  };
+};
+
+
+/**
  * ================= EXPORT =================
  */
 module.exports = {
   getHoldings,
-  getHoldingsReport,   // ✅ NEW
+  getHoldingsReport,
   getOpenPosition,
   getGlobalPosition,
   getFoGlobalPosition,
   getTrialBalance,
-  getClientMIS
+  getClientMIS,
+  getCapitalBrokerage,
+  getThirdPartyBrokerage,
+  getResearchBrokerage,
 };

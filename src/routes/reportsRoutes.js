@@ -60,4 +60,25 @@ router.get('/trial-balance', authenticate, reportController.getTrialBalance);
 router.get('/client-mis', authenticate, reportController.getClientMIS);
 
 
+/**
+ * ================= CAPITAL BROKERAGE =================
+ * GET /api/reports/brokerage/capital?datefrom=&dateTo=&Search=&SearchType=Clientcode&size=50&pageNumber=0
+ */
+router.get('/brokerage/capital', authenticate, reportController.getCapitalBrokerage);
+
+
+/**
+ * ================= THIRD PARTY BROKERAGE =================
+ * GET /api/reports/brokerage/third-party?fromDate=&ToDate=&size=50&pageNumber=0
+ */
+router.get('/brokerage/third-party', authenticate, reportController.getThirdPartyBrokerage);
+
+
+/**
+ * ================= RESEARCH BROKERAGE =================
+ * GET /api/reports/brokerage/research?TradeDate=&size=50&pageNumber=0
+ */
+router.get('/brokerage/research', authenticate, reportController.getResearchBrokerage);
+
+
 module.exports = router;
