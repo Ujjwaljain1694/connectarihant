@@ -81,4 +81,127 @@ router.get('/brokerage/third-party', authenticate, reportController.getThirdPart
 router.get('/brokerage/research', authenticate, reportController.getResearchBrokerage);
 
 
+/**
+ * ================= 🔵 SEND OTP =================
+ * POST /api/reports/brokerage/send-otp
+ */
+router.post('/brokerage/send-otp', authenticate, reportController.sendOtp);
+
+
+/**
+ * ================= 🟢 VERIFY OTP =================
+ * POST /api/reports/brokerage/verify-otp
+ * Body: { "otp": "123456" }
+ */
+router.post('/brokerage/verify-otp', authenticate, reportController.verifyOtp);
+
+
+/**
+ * ================= 📊 BROKERAGE SUMMARY =================
+ * GET /api/reports/brokerage/summary?datefrom=DD-MM-YYYY&dateTo=DD-MM-YYYY
+ * Header: x-otp: <manager_otp_from_verify>
+ */
+router.get(
+  '/brokerage/summary',
+  authenticate,
+  reportController.getBrokerageSummary
+);
+
+
+/**
+ * ================= 📱 MOBILE LOGIN SUMMARY =================
+ * GET /api/reports/mobile-login-summary?datefrom=DD-MM-YYYY&dateto=DD-MM-YYYY
+ */
+router.get(
+  '/mobile-login-summary',
+  authenticate,
+  reportController.getMobileLoginSummary
+);
+
+
+/**
+ * ================= 📱 MOBILE LOGIN REPORT =================
+ * GET /api/reports/mobile-login-report?datefrom=DD-MM-YYYY&dateto=DD-MM-YYYY&pageNumber=0&size=50
+ */
+router.get(
+  '/mobile-login-report',
+  authenticate,
+  reportController.getMobileLoginReport
+);
+// ================= 📊 BRANCH PERFORMANCE =================
+// GET /api/reports/branch-performance?datefrom=DD-MM-YYYY&dateto=DD-MM-YYYY
+router.get(
+  '/branch-performance',
+  authenticate,
+  reportController.getBranchPerformance
+);
+// ================= 📊 REACTIVATION REPORT =================
+router.get(
+  '/reactivation-report',
+  authenticate,
+  reportController.getReactivationReport
+);
+// ================= 📊 SAMPARK REPORT =================
+router.get(
+  '/sampark-report',
+  authenticate,
+  reportController.getSamparkReport
+);
+
+// ================= 📊 KRA STATUS =================
+router.get(
+  '/kra-status',
+  authenticate,
+  reportController.getKRA
+);
+
+// ================= 📊 HOLD KRA =================
+router.get(
+  '/hold-kra',
+  authenticate,
+  reportController.getHoldKRA
+);
+
+// ================= 📊 MODIFICATION =================
+router.get(
+  '/modification',
+  authenticate,
+  reportController.getModification
+);
+
+// ================= 📊 PHYSICAL ACCOUNT =================
+router.get(
+  '/physical-account',
+  authenticate,
+  reportController.getPhysical
+);
+
+// ================= 📊 REACTIVATION =================
+router.get(
+  '/reactivation-report',
+  authenticate,
+  reportController.getReactivationReport
+);
+
+// ================= 📊 SAMPARK =================
+router.get(
+  '/sampark-report',
+  authenticate,
+  reportController.getSamparkReport
+);
+// ================= 📊 NOMINEE PENDING =================
+router.get(
+  '/nominee-pending',
+  authenticate,
+  reportController.getNomineePending
+);
+
+// ================= 📊 COMPLIANCE CIRCULAR =================
+router.get(
+  '/compliance-circular',
+  authenticate,
+  reportController.getComplianceCircular
+);
+
+
 module.exports = router;

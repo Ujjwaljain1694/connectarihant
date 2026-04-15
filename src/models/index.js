@@ -8,7 +8,15 @@ const TrialBalance = require('./TrialBalance');
 const Brokerage = require('./Brokerage');
 const ThirdParty = require('./ThirdParty');
 const Research = require('./Research');
-
+const BranchPerformance = require('./BranchPerformance');
+const ReactivationReport = require('./ReactivationReport');
+const SamparkReport = require('./SamparkReport');
+const KRAStatus = require('./KRAStatus');
+const HoldKRA = require('./HoldKRA');
+const Modification = require('./Modification');
+const PhysicalAccount = require('./PhysicalAccount');
+const NomineePending = require('./NomineePending');
+const ComplianceCircular = require('./ComplianceCircular');
 // Associations
 Manager.hasMany(Client, { foreignKey: 'manager_id', as: 'clients' });
 Client.belongsTo(Manager, { foreignKey: 'manager_id', as: 'manager' });
@@ -28,4 +36,14 @@ ThirdParty.belongsTo(Manager, { foreignKey: 'manager_id', as: 'manager' });
 Manager.hasMany(Research, { foreignKey: 'manager_id', as: 'research' });
 Research.belongsTo(Manager, { foreignKey: 'manager_id', as: 'manager' });
 
-module.exports = { sequelize, Manager, Client, Holding, Position, OTP, TrialBalance, Brokerage, ThirdParty, Research };
+Manager.hasMany(BranchPerformance, { foreignKey: 'manager_id', as: 'branchPerformance' });
+BranchPerformance.belongsTo(Manager, { foreignKey: 'manager_id', as: 'manager' });
+
+Manager.hasMany(ReactivationReport, { foreignKey: 'manager_id', as: 'reactivationReports' });
+ReactivationReport.belongsTo(Manager, { foreignKey: 'manager_id', as: 'manager' });
+
+Manager.hasMany(SamparkReport, { foreignKey: 'manager_id', as: 'samparkReports' });
+SamparkReport.belongsTo(Manager, { foreignKey: 'manager_id', as: 'manager' });
+
+
+module.exports = { sequelize, Manager, Client, Holding, Position, OTP, TrialBalance, Brokerage, ThirdParty, Research,  BranchPerformance ,ReactivationReport, SamparkReport, KRAStatus, HoldKRA, Modification, PhysicalAccount,  NomineePending, ComplianceCircular};

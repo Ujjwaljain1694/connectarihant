@@ -1,6 +1,8 @@
-const { Holding, Position, Client, TrialBalance, Brokerage, ThirdParty, Research } = require('../models');
+const { Holding, Position, Client, TrialBalance, Brokerage, ThirdParty, Research, BranchPerformance, ReactivationReport,
+  SamparkReport, KRAStatus, HoldKRA, Modification, PhysicalAccount, NomineePending, ComplianceCircular } = require('../models');
 const { Op } = require('sequelize');
 const convertDate = require("../utils/formatDate"); // ✅ NEW
+const otpStore = require("../utils/otpStore"); // ✅ OTP Store
 
 
 /**
@@ -480,6 +482,574 @@ const getResearchBrokerage = async (manager_id, query) => {
 
 
 /**
+ * ================= BROKERAGE SUMMARY =================
+ */
+const getBrokerageSummary = async (managerId, query, otpFromHeader) => {
+  const { datefrom, dateTo } = query;
+
+  if (!datefrom || !dateTo) {
+    throw new Error("datefrom and dateTo are required");
+  }
+
+  // ✅ Check OTP Verification
+  const record = otpStore[managerId];
+
+  console.log("HEADER OTP:", otpFromHeader);
+  console.log("STORED OTP:", record?.otp);
+  console.log("VERIFIED:", record?.verified);
+
+  // If OTP not valid, return masked data
+  if (
+    !record ||
+    !record.verified ||
+    !otpFromHeader ||
+    parseInt(otpFromHeader) !== record.otp
+  ) {
+    return {
+      totalBrokerage: "XXXX",
+      totalCapBrokerage: "XXXX",
+      totalCommBrokerage: "XXXX",
+      totalFnoBrokerage: "XXXX",
+      totalCapTurnover: "XXXX",
+      totalFnoTurnover: "XXXX",
+      totalTurnover: "XXXX",
+      totalCommTurnover: "XXXX"
+    };
+  }
+
+  const from = convertDate(datefrom);
+  const to = convertDate(dateTo);
+
+  const data = await Brokerage.findAll({
+    where: {
+      date: {
+        [Op.between]: [
+          new Date(`${from} 00:00:00`),
+          new Date(`${to} 23:59:59`)
+        ]
+      }
+    }
+  });
+
+  let totalBrokerage = 0;
+  let totalTurnover = 0;
+
+  let capBrokerage = 0;
+  let fnoBrokerage = 0;
+  let commBrokerage = 0;
+
+  let capTurnover = 0;
+  let fnoTurnover = 0;
+  let commTurnover = 0;
+
+  data.forEach(d => {
+    const brokerage = parseFloat(d.brokerage || 0);
+    const turnover = parseFloat(d.turnover || 0);
+
+    totalBrokerage += brokerage;
+    totalTurnover += turnover;
+
+    if (d.type === 'CAPITAL') {
+      capBrokerage += brokerage;
+      capTurnover += turnover;
+    }
+
+    if (d.type === 'FNO') {
+      fnoBrokerage += brokerage;
+      fnoTurnover += turnover;
+    }
+
+    if (d.type === 'COMMODITY') {
+      commBrokerage += brokerage;
+      commTurnover += turnover;
+    }
+  });
+
+  // ✅ Return real data after OTP verified
+  return {
+    totalBrokerage,
+    totalCapBrokerage: capBrokerage,
+    totalCommBrokerage: commBrokerage,
+    totalFnoBrokerage: fnoBrokerage,
+    totalCapTurnover: capTurnover,
+    totalFnoTurnover: fnoTurnover,
+    totalTurnover,
+    totalCommTurnover: commTurnover
+  };
+};
+
+
+/**
+ * ================= HELPER FUNCTIONS =================
+ */
+function convertDateHelper(dateStr) {
+  if (!dateStr) return null;
+  const [dd, mm, yyyy] = dateStr.split("-");
+  return new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+}
+
+function formatDateHelper(date) {
+  if (!date) return 'N/A';
+  const d = new Date(date);
+  return d.toISOString().split("T")[0];
+}
+
+
+/**
+ * ================= MOBILE LOGIN SUMMARY =================
+ */
+const getMobileLoginSummary = async ({ manager_id, datefrom, dateto }) => {
+  if (!datefrom || !dateto) {
+    throw new Error("datefrom and dateto are required");
+  }
+
+  const from = convertDateHelper(datefrom);
+  const to = new Date(convertDateHelper(dateto));
+  to.setHours(23, 59, 59, 999);
+
+  const TotalActiveClients = await Client.count({
+    where: { manager_id, status: "Active" },
+  });
+
+  const TotalLoginClients = await Client.count({
+    where: {
+      manager_id,
+      app_login_count: { [Op.gt]: 0 },
+      updatedAt: { [Op.between]: [from, to] },
+    },
+  });
+
+  const TotalTradedClients = await Client.count({
+    where: {
+      manager_id,
+      app_login_count: { [Op.gt]: 0 },
+      updatedAt: { [Op.between]: [from, to] },
+    },
+  });
+
+  const TotalNonTradedClients = await Client.count({
+    where: {
+      manager_id,
+      app_login_count: 0,
+      updatedAt: { [Op.between]: [from, to] },
+    },
+  });
+
+  return {
+    TotalActiveClients,
+    TotalLoginClients,
+    TotalTradedClients,
+    TotalNonTradedClients,
+  };
+};
+
+
+/**
+ * ================= MOBILE LOGIN REPORT =================
+ */
+const getMobileLoginReport = async ({
+  manager_id,
+  pageNumber = 0,
+  size = 50,
+  datefrom,
+  dateto,
+}) => {
+  if (!datefrom || !dateto) {
+    throw new Error("datefrom and dateto are required");
+  }
+
+  const offset = pageNumber * size;
+  const from = convertDateHelper(datefrom);
+  const to = new Date(convertDateHelper(dateto));
+  to.setHours(23, 59, 59, 999);
+
+  const { count, rows } = await Client.findAndCountAll({
+    where: {
+      manager_id,
+      updatedAt: {
+        [Op.between]: [from, to],
+      },
+    },
+    limit: parseInt(size),
+    offset: parseInt(offset),
+    order: [["updatedAt", "DESC"]],
+  });
+
+  const totalActive = await Client.count({
+    where: { manager_id, status: "Active" },
+  });
+
+  const totalLogin = await Client.count({
+    where: {
+      manager_id,
+      app_login_count: { [Op.gt]: 0 },
+    },
+  });
+
+  const totalTraded = totalLogin;
+
+  const totalNonTraded = await Client.count({
+    where: {
+      manager_id,
+      app_login_count: 0,
+    },
+  });
+
+  const clientlist = rows.map((client) => ({
+    client_name: client.client_name,
+    client_code: client.client_code,
+    status: client.status,
+    trade_status: client.app_login_count > 0 ? "YES" : "NO",
+    last_login_date: formatDateHelper(client.updatedAt),
+    last_traded_date: formatDateHelper(client.updatedAt),
+  }));
+
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / size),
+    rowsPerPage: parseInt(size),
+    TotalActiveClients: totalActive,
+    TotalLoginClients: totalLogin,
+    TotalTradedClients: totalTraded,
+    TotalNonTradedClients: totalNonTraded,
+    clientlist,
+  };
+};
+
+/**
+================= BRANCH PERFORMANCE =================
+*/
+
+const getBranchPerformance = async (managerId, query) => {
+  const { datefrom, dateto } = query;
+
+  if (!datefrom || !dateto) {
+    throw new Error("datefrom and dateto are required");
+  }
+
+  // local converter (avoid conflict)
+  const formatDateLocal = (dateStr) => {
+    const [d, m, y] = dateStr.split('-');
+    return `${y}-${m}-${d}`;
+  };
+
+  const from = formatDateLocal(datefrom);
+  const to = formatDateLocal(dateto);
+
+  const rows = await BranchPerformance.findAll({
+    where: {
+      manager_id: managerId,
+      date: {
+        [Op.between]: [
+          new Date(`${from} 00:00:00`),
+          new Date(`${to} 23:59:59`)
+        ]
+      }
+    }
+  });
+
+  if (!rows.length) {
+    return {
+      all_Count: 0,
+      perfdata: null
+    };
+  }
+
+  const r = rows[0];
+
+  return {
+    all_Count: rows.length,
+    perfdata: {
+      BranchCode: r.branch_code,
+      BranchName: r.branch_name,
+      BranchPan: r.branch_pan || "",
+      Address: r.address,
+      Mobile: r.mobile,
+      Email: r.email,
+      GrossRevenue: parseFloat(r.gross_revenue || 0),
+      TotalClients: parseInt(r.total_clients || 0),
+      ActiveClients: parseInt(r.active_clients || 0),
+      MobileAppDownload: parseInt(r.mobile_app_download || 0),
+      MFAUM: parseFloat(r.mf_aum || 0),
+      MFSIP: parseFloat(r.mf_sip || 0),
+      NoOfSIP: parseInt(r.no_of_sip || 0),
+      PMSAUM: parseFloat(r.pms_aum || 0),
+      WealhBasket: parseFloat(r.wealth_basket || 0),
+      PreIPODeals: parseFloat(r.pre_ipo_deals || 0),
+      BranchBrokerage: parseFloat(r.branch_brokerage || 0),
+      Remark: r.remark
+    }
+  };
+};
+/**
+================= REACTIVATION REPORT =================
+*/
+
+const getReactivationReport = async (managerId, query) => {
+  const { pageNumber = 0, size = 50, Search, datefrom, dateto } = query;
+
+  const where = {
+    manager_id: managerId
+  };
+
+  if (Search) {
+    where.client_code = Search;
+  }
+
+  if (datefrom && dateto) {
+    where.date = {
+      [Op.between]: [
+        new Date(`${convertDate(datefrom)} 00:00:00`),
+        new Date(`${convertDate(dateto)} 23:59:59`)
+      ]
+    };
+  }
+
+  const { count, rows } = await ReactivationReport.findAndCountAll({
+    where,
+    limit: parseInt(size),
+    offset: pageNumber * size
+  });
+
+  if (!rows.length) {
+    return {
+      success: true,
+      message: "Data not found !!!",
+      result: {
+        all_Count: 0,
+        numberOfPages: 0,
+        rowsPerPage: parseInt(size),
+        clientlist: null
+      }
+    };
+  }
+
+  return {
+    success: true,
+    message: "Reactivation Data",
+    result: {
+      all_Count: count,
+      numberOfPages: Math.ceil(count / size),
+      rowsPerPage: parseInt(size),
+      clientlist: rows
+    }
+  };
+};
+/**
+================= SAM PARK REPORT =================
+*/
+const getSamparkReport = async (managerId, query) => {
+  const { pageNumber = 0, size = 50, clientcode, fromDate, ToDate } = query;
+
+  const where = {
+    manager_id: managerId
+  };
+
+  if (clientcode) {
+    where.client_code = clientcode;
+  }
+
+  if (fromDate && ToDate) {
+    where.call_date = {
+      [Op.between]: [
+        new Date(`${convertDate(fromDate)} 00:00:00`),
+        new Date(`${convertDate(ToDate)} 23:59:59`)
+      ]
+    };
+  }
+
+  const { count, rows } = await SamparkReport.findAndCountAll({
+    where,
+    limit: parseInt(size),
+    offset: pageNumber * size
+  });
+
+  if (!rows.length) {
+    return {
+      success: false,
+      message: "No Record Found !!",
+      result: {
+        all_Count: 0,
+        numberOfPages: 0,
+        rowsPerPage: parseInt(size),
+        CallLogList: []
+      }
+    };
+  }
+
+  return {
+    success: true,
+    message: "Sampark Data",
+    result: {
+      all_Count: count,
+      numberOfPages: Math.ceil(count / size),
+      rowsPerPage: parseInt(size),
+      CallLogList: rows
+    }
+  };
+};
+/**
+ * ================= KRA =================
+ */
+const getKRA = async (query) => {
+  const { clientcode } = query;
+
+  let where = {};
+
+  if (clientcode) {
+    where.client_code = clientcode; // ✅ exact match
+  }
+
+  const data = await KRAStatus.findAll({ where });
+
+  return {
+    success: true,
+    message: data.length ? "Data found" : "No data",
+    result: { clientlist: data }
+  };
+};
+
+/**
+ * ================= HOLD KRA =================
+ */
+const getHoldKRA = async (managerId, query) => {
+  const { Search } = query;
+
+  const where = {};
+
+  if (Search) {
+    where.client_code = { [Op.like]: `%${Search}%` };
+  }
+
+  const rows = await HoldKRA.findAll({ where });
+
+  return {
+    success: true,
+    message: rows.length ? "Hold KRA Data" : "No data",
+    result: {
+      all_Count: rows.length,
+      clientlist: rows
+    }
+  };
+};
+
+/**
+ * ================= MODIFICATION =================
+ */
+const getModification = async (managerId, query) => {
+  const { clientcode } = query;
+
+  const where = {};
+
+  if (clientcode) {
+    where.client_code = clientcode; // ✅ exact match
+  }
+
+  const rows = await Modification.findAll({ where });
+
+  return {
+    success: true,
+    message: rows.length ? "Modification Data" : "No data",
+    result: {
+      all_Count: rows.length,
+      clientlist: rows
+    }
+  };
+};
+/**
+ * ================= PHYSICAL =================
+ */
+const getPhysical = async (managerId, query) => {
+  const { clientcode } = query;
+
+  const where = {};
+
+  if (clientcode) {
+    where.client_code = clientcode; // ✅ exact match
+  }
+
+  const rows = await PhysicalAccount.findAll({ where });
+
+  return {
+    success: true,
+    message: rows.length ? "Physical Data" : "No data",
+    result: {
+      all_Count: rows.length,
+      clientlist: rows
+    }
+  };
+};
+/**
+ * ================= NOMINEE PENDING =================
+ */
+const getNomineePending = async (query) => {
+  const { client_code = '', client_name = '', mobile = '' } = query;
+
+  let where = {};
+
+  if (client_code) {
+    where.client_code = { [Op.like]: `%${client_code}%` };
+  }
+
+  if (client_name) {
+    where.client_name = { [Op.like]: `%${client_name}%` };
+  }
+
+  if (mobile) {
+    where.mobile = { [Op.like]: `%${mobile}%` };
+  }
+
+  const data = await NomineePending.findAll({ where });
+
+  return {
+    success: true,
+    message: data.length ? "Data fetched successfully" : "Data not found !!!",
+    result: {
+      all_Count: data.length,
+      clientlist: data.length ? data : null
+    }
+  };
+};
+/**
+ * ================= COMPLIANCE CIRCULAR =================
+ */
+
+const getComplianceCircular = async (query) => {
+  const { datefrom, dateto, type } = query;
+
+  let where = {};
+
+  if (datefrom && dateto) {
+    const from = convertDate(datefrom);
+    const to = convertDate(dateto);
+
+    where.date = {
+      [Op.between]: [
+        `${from} 00:00:00`,
+        `${to} 23:59:59`
+      ]
+    };
+  }
+
+  if (type) {
+    where.compliance_type = type;
+  }
+
+  const data = await ComplianceCircular.findAll({
+    where,
+    order: [['date', 'DESC']]
+  });
+
+  return {
+    success: true,
+    message: data.length ? "Data fetched successfully" : "Data not found !!!",
+    result: {
+      total: data.length,
+      circulars: data
+    }
+  };
+};
+/**
  * ================= EXPORT =================
  */
 module.exports = {
@@ -493,4 +1063,16 @@ module.exports = {
   getCapitalBrokerage,
   getThirdPartyBrokerage,
   getResearchBrokerage,
+  getBrokerageSummary,
+  getMobileLoginSummary,
+  getMobileLoginReport,
+  getBranchPerformance,
+  getReactivationReport,
+  getSamparkReport,
+  getKRA,
+  getHoldKRA,
+  getModification,
+  getPhysical,
+  getNomineePending,
+  getComplianceCircular
 };
