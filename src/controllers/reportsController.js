@@ -506,7 +506,259 @@ const getComplianceCircular = async (req, res, next) => {
 };
 
 
+// ================= MARKETING MATERIAL =================
+const getMarketingMaterial = async (req, res, next) => {
+  try {
+    const data = await reportsService.getMarketingMaterial(req.query);
+    return res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+// ================= DOWNLOAD FILES =================
+const getDownloadFiles = async (req, res, next) => {
+  try {
+    const data = await reportsService.getDownloadFiles();
+    return res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+// ================= CERTIFICATES =================
+const getCertificates = async (req, res, next) => {
+  try {
+    const data = await reportsService.getCertificates();
+    return res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+// ================= 📤 UPLOAD CERTIFICATE =================
+const uploadCertificate = async (req, res, next) => {
+  try {
+    const file = req.files && req.files.length > 0 ? req.files[0] : req.file;
+
+    const data = await reportsService.uploadCertificate(file);
+
+    return sendSuccess(
+      res,
+      data,
+      "Certificate uploaded successfully"
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+// ================= 📤 UPLOAD CERTIFICATE =================
+const getMtfBalance = async (req, res) => {
+  try {
+    const data = await reportsService.getMtfBalance(req.query);
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+// ================= 📊 MTF REPORT =================
+const getMTFReport = async (req, res, next) => {
+  try {
+    const data = await reportsService.getMTFReport(req.query);
+
+    return res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ================= 📊 IPO REPORT =================
+const getIPOReport = async (req, res, next) => {
+  try {
+    const data = await reportsService.getIPOReport(req.query);
+    return res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ================= 📄 DP SLIP =================
+const getDPSlip = async (req, res, next) => {
+  try {
+    const data = await reportsService.getDPSlip(req.query);
+    return res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ================= 📈 RESEARCH CALL =================
+const getResearchCallDisplay = async (req, res, next) => {
+  try {
+    const { SearchType } = req.query;
+
+    if (!SearchType) {
+      return res.status(400).json({
+        success: false,
+        message: "SearchType is required"
+      });
+    }
+
+    const data = await reportsService.getResearchCalls(SearchType);
+
+    return res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ================= 📈 ALGO BROKERAGE =================
+const getAlgoBrokerage = async (req, res, next) => {
+  try {
+    const { datefrom, dateto, pageNumber, size } = req.query;
+
+    if (!datefrom || !dateto) {
+      return res.status(400).json({
+        success: false,
+        message: "datefrom and dateto are required",
+      });
+    }
+
+    const data = await reportsService.getAlgoBrokerage({
+      datefrom,
+      dateto,
+      pageNumber,
+      size
+    });
+
+    return res.json(data);
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Internal server error"
+    });
+  }
+};
+
+// ================= 📈 MUTUAL FUND =================
+const getMutualFundReport = async (req, res, next) => {
+  try {
+    const data = await reportsService.getMutualFundReport(req.query);
+
+    return sendSuccess(
+      res,
+      data,
+      data.all_Count ? "Data fetched successfully" : "Data not found !!!"
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ================= MF REJECTION =================
+const getMfRejectionReport = async (req, res, next) => {
+  try {
+    const data = await reportsService.getMfRejectionReport(req.query);
+
+    return sendSuccess(
+      res,
+      data,
+      data.MfRejection.length ? "Data fetched successfully" : "Data not found !!!"
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ================= MF MANDATE REPORT =================
+const getMfMandateReport = async (req, res, next) => {
+  try {
+    const data = await reportsService.getMfMandateReport(req.query);
+
+    return sendSuccess(
+      res,
+      data,
+      data.MfMandate ? "Data fetched successfully" : "Data not found !!!"
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ================= BOND OFFER =================
+const getBondOffers = async (req, res, next) => {
+  try {
+    const data = await reportsService.getBondOffers();
+
+    return sendSuccess(
+      res,
+      data,
+      "Details !!"
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ================= 📊 CONTEST DATA =================
+const getContestData = async (req, res, next) => {
+  try {
+    const data = await reportsService.getContestData(req.query);
+
+    return sendSuccess(
+      res,
+      data,
+      data.list.length ? "Client Details" : "Data not found !!!"
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ================= INACTIVE CLIENTS =================
+const getInactiveClients = async (req, res, next) => {
+  try {
+    const data = await reportsService.getInactiveClients(req.query);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ================= 📝 FOLLOW UP DATA =================
+const getFollowUpData = async (req, res, next) => {
+  try {
+    const data = await reportsService.getFollowUpData(req.query);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ================= 💰 CLIENT BALANCE (PAYOUT) =================
+const getClientBalance = async (req, res, next) => {
+  try {
+    const data = await reportsService.getClientBalance(req.query);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
+  getBondOffers,
+  getMfMandateReport,
+  getMfRejectionReport,
+  getMutualFundReport,
+  getAlgoBrokerage,
+  getResearchCallDisplay,
+  getDPSlip,
+  getIPOReport,
   getHoldings,
   getHoldingsReport,
   getPositions,
@@ -531,6 +783,16 @@ module.exports = {
   getModification,
   getPhysical,
   getNomineePending,
-  getComplianceCircular
+  getComplianceCircular,
+  getMarketingMaterial,
+  getDownloadFiles,
+  getCertificates,
+  uploadCertificate,
+  getMtfBalance,
+  getMTFReport,
+  getContestData,
+  getInactiveClients,
+  getFollowUpData,
+  getClientBalance
 
 };

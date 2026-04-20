@@ -9,6 +9,7 @@ const authRoutes = require('./routes/authRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const reportsRoutes = require('./routes/reportsRoutes');
+const payoutRoutes = require('./routes/payoutRoutes');
 const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
@@ -64,6 +65,14 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/payout', payoutRoutes);
+require('./routes/payoutCancel.routes')(app);
+require('./routes/payoutReport.routes')(app);
+app.use('/api/payout', require('./routes/bulkPayout.routes'));
+require('./routes/mfStructure.routes')(app);
+
+// ─── Static Route ─────────────────────────────────────────────────────────────
+app.use('/uploads', express.static('uploads'));
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {

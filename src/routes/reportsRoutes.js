@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-
+const upload = require('../middlewares/upload');
 const reportController = require('../controllers/reportsController');
 const { authenticate } = require('../middlewares/authMiddleware');
 
@@ -203,5 +203,122 @@ router.get(
   reportController.getComplianceCircular
 );
 
+// ================= 📊 MARKETING MATERIAL =================
+router.get(
+  '/marketing-material',
+  authenticate,
+  reportController.getMarketingMaterial
+);
+
+// ================= 📊 DOWNLOAD FILES =================
+router.get(
+  '/download-files',
+  authenticate,   // 🔐 token required
+  reportController.getDownloadFiles
+);
+
+// ================= 📊 CERTIFICATES =================
+router.get(
+  '/certificate',
+  authenticate,
+  reportController.getCertificates
+);
+// ================= 📤 UPLOAD CERTIFICATE =================
+router.post(
+  '/upload-certificate',
+  authenticate,
+  upload.any(), // Changed from upload.single('file') to bypass field name mismatch
+  reportController.uploadCertificate
+);
+// ================= 📊 MTF BALANCE =================
+router.get(
+  '/mtf-balance',
+  authenticate,
+  reportController.getMtfBalance
+);
+
+// ================= 📊 MTF REPORT =================
+router.get(
+  '/mtf-report',
+  authenticate,
+  reportController.getMTFReport
+);
+
+// ================= 📊 IPO REPORT =================
+router.get(
+  '/ipo-report',
+  authenticate,
+  reportController.getIPOReport
+);
+
+// ================= 📄 DP SLIP (GET) =================
+router.get(
+  '/dp-slip',
+  authenticate,
+  reportController.getDPSlip
+);
+
+// ================= 📈 RESEARCH CALL =================
+router.get(
+  '/research-call',
+  authenticate,
+  reportController.getResearchCallDisplay
+);
+
+// ================= 📈 ALGO BROKERAGE =================
+router.get(
+  '/algo-brokerage',
+  authenticate,
+  reportController.getAlgoBrokerage
+);
+
+// ================= 📈 MUTUAL FUND REPORT =================
+router.get(
+  '/mutual-fund-report',
+  authenticate,
+  reportController.getMutualFundReport
+);
+
+// ================= ❌ MF REJECTION =================
+router.get(
+  '/mf-rejection-report',
+  authenticate,
+  reportController.getMfRejectionReport
+);
+
+// ================= 📋 MF MANDATE REPORT =================
+router.get(
+  '/mf-mandate-report',
+  authenticate,
+  reportController.getMfMandateReport
+);
+
+// ================= 📈 BOND OFFER =================
+router.post(
+  '/bond-offer',
+  authenticate,
+  reportController.getBondOffers
+);
+
+// ================= 📊 CONTEST DATA =================
+router.get(
+  '/contest-data',
+  authenticate,
+  reportController.getContestData
+);
+
+// ================= 🚪 INACTIVE CLIENTS =================
+router.get(
+  "/inactive-clients",
+  authenticate,
+  reportController.getInactiveClients
+);
+
+// ================= 📝 FOLLOW UP REPORT =================
+router.get(
+  "/followup-report",
+  authenticate, // Bearer token
+  reportController.getFollowUpData
+);
 
 module.exports = router;

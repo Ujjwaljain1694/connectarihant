@@ -1,5 +1,5 @@
 const { Holding, Position, Client, TrialBalance, Brokerage, ThirdParty, Research, BranchPerformance, ReactivationReport,
-  SamparkReport, KRAStatus, HoldKRA, Modification, PhysicalAccount, NomineePending, ComplianceCircular } = require('../models');
+  SamparkReport, KRAStatus, HoldKRA, Modification, PhysicalAccount, NomineePending, ComplianceCircular, MarketingMaterial, DownloadFile, Certificate, UploadCertificate, MtfBalance } = require('../models');
 const { Op } = require('sequelize');
 const convertDate = require("../utils/formatDate"); // ✅ NEW
 const otpStore = require("../utils/otpStore"); // ✅ OTP Store
@@ -1049,10 +1049,664 @@ const getComplianceCircular = async (query) => {
     }
   };
 };
+
+/**
+ * ================= MARKETING MATERIAL =================
+ */
+const getMarketingMaterial = async (query) => {
+  const { pageNumber = 0, size = 50, category } = query;
+
+  let where = {};
+
+  // optional category filter
+  if (category) {
+    where.category = category;
+  }
+
+  const limit = parseInt(size);
+  const offset = parseInt(pageNumber) * limit;
+
+  const { count, rows } = await MarketingMaterial.findAndCountAll({
+    where,
+    limit,
+    offset,
+    order: [['create_date', 'DESC']]
+  });
+
+  return {
+    success: true,
+    message: "Details!!",   // 👈 ALWAYS SAME (as per your requirement)
+    result: {
+      all_Count: count,
+      numberOfPages: Math.ceil(count / limit),
+      rowsPerPage: limit,
+      clientlist: rows.map(item => ({
+        Category: item.category,
+        FileName: item.file_name,
+        FileUrl: item.file_url || "url_here", // fallback
+        CreateDate: item.create_date
+      }))
+    }
+  };
+};
+
+/**
+ * ================= DOWNLOAD FILES =================
+ */
+const getDownloadFiles = async () => {
+  const data = await DownloadFile.findAll({
+    order: [['category', 'ASC']]
+  });
+
+  const grouped = {};
+
+  data.forEach(item => {
+    const category = item.category;
+    const subcategory = item.subcategory;
+
+    if (!grouped[category]) {
+      grouped[category] = {};
+    }
+
+    if (!grouped[category][subcategory]) {
+      grouped[category][subcategory] = [];
+    }
+
+    grouped[category][subcategory].push({
+      FileName: item.file_name,
+      URL: item.file_url
+    });
+  });
+
+  const result = Object.keys(grouped).map(cat => ({
+    categoryName: cat,
+    subcategory: Object.keys(grouped[cat]).map(sub => ({
+      subcategoryName: sub,
+      fileDetail: grouped[cat][sub]
+    }))
+  }));
+
+  return {
+    success: true,
+    message: null,
+    result
+  };
+};
+
+
+/**
+ * ================= CERTIFICATES =================
+ */
+const getCertificates = async () => {
+  const rows = await Certificate.findAll({
+    order: [['createdAt', 'DESC']]
+  });
+
+  return {
+    success: true,
+    message: rows.length ? "Details!!" : "Data not found !!!",
+    result: {
+      all_Count: rows.length,
+      certificatelist: rows.length
+        ? rows.map(item => ({
+          CertificateName: item.certificate_name,
+          FileUrl: item.certificate_file_url,
+          IssueDate: item.issue_date,
+          ExpiryDate: item.expiry_date
+        }))
+        : null
+    }
+  };
+};
+/**
+ * ================= UPLOAD CERTIFICATES =================
+ */
+const uploadCertificate = async (file) => {
+  if (!file) {
+    throw new Error("File is required");
+  }
+
+  const data = await UploadCertificate.create({
+    file_name: file.originalname,
+    file_url: file.path
+  });
+
+  return {
+    success: true,
+    message: "Certificate uploaded successfully",
+    result: data
+  };
+};
+/**
+ * ================= MTF BALANCE =================
+ */
+const getMtfBalance = async (query) => {
+  const { pageNumber = 0, size = 50, clientcode } = query;
+
+  const where = {};
+  if (clientcode) {
+    where.client_code = clientcode;
+  }
+
+  const { count, rows } = await MtfBalance.findAndCountAll({
+    where,
+    limit: parseInt(size),
+    offset: pageNumber * size,
+    order: [["createdAt", "DESC"]],
+  });
+
+  if (count === 0) {
+    return {
+      success: false,
+      message: "no record found",
+      result: {
+        all_Count: 0,
+        numberOfPages: 0,
+        rowsPerPage: 0,
+        balancelist: []
+      }
+    };
+  }
+
+  return {
+    success: true,
+    message: "Details!!",
+    result: {
+      all_Count: count,
+      numberOfPages: Math.ceil(count / size),
+      rowsPerPage: size,
+      balancelist: rows
+    }
+  };
+};
+
+
+
+const { MTFRequestReport } = require('../models');
+const moment = require('moment');
+
+const getMTFReport = async (query) => {
+  const {
+    pageNumber = 0,
+    size = 50,
+    requestdate,
+    Search
+  } = query;
+
+  let where = {};
+
+  // 📅 DATE FILTER
+  if (requestdate) {
+    const date = moment(requestdate, "DD-MM-YYYY").format("YYYY-MM-DD");
+    where.request_date = date;
+  }
+
+  // 🔍 CLIENT CODE SEARCH
+  if (Search) {
+    where.client_code = {
+      [Op.like]: `%${Search}%`
+    };
+  }
+
+  const { count, rows } = await MTFRequestReport.findAndCountAll({
+    where,
+    limit: parseInt(size),
+    offset: parseInt(pageNumber * size),
+    order: [['request_date', 'DESC']]
+  });
+
+  return {
+    success: true,
+    message: count ? "Data fetched successfully" : "no record found",
+    result: {
+      all_Count: count,
+      numberOfPages: Math.ceil(count / size),
+      rowsPerPage: parseInt(size),
+      Mtflist: rows
+    }
+  };
+};
+
+const { IPOReport } = require('../models');
+
+const getIPOReport = async (query) => {
+  const {
+    pageNumber = 0,
+    size = 50,
+    datefrom,
+    dateto
+  } = query;
+
+  let where = {};
+
+  // 📅 DATE FILTER
+  if (datefrom && dateto) {
+    const from = moment(datefrom, "DD-MM-YYYY").format("YYYY-MM-DD");
+    const to = moment(dateto, "DD-MM-YYYY").format("YYYY-MM-DD");
+
+    where.application_date = {
+      [Op.between]: [from, to]
+    };
+  }
+
+  const { count, rows } = await IPOReport.findAndCountAll({
+    where,
+    limit: parseInt(size),
+    offset: parseInt(pageNumber * size),
+    order: [['application_date', 'DESC']]
+  });
+
+  return {
+    success: count ? true : false,
+    message: count ? "Data fetched successfully" : "no record found",
+    result: {
+      all_Count: count,
+      numberOfPages: Math.ceil(count / size),
+      rowsPerPage: parseInt(size),
+      IPOlist: rows
+    }
+  };
+};
+
+const { DPSlip } = require('../models');
+
+const getDPSlip = async (query) => {
+  const { ClientCode, datefrm, dateto } = query;
+
+  // ❌ validation
+  if (!ClientCode) {
+    return {
+      success: false,
+      message: "ClientCode is required",
+      result: {}
+    };
+  }
+
+  // 📅 date convert
+  const from = moment(datefrm, ["DD-MM-YYYY","D-M-YYYY"]).format("YYYY-MM-DD");
+  const to = moment(dateto, ["DD-MM-YYYY","D-M-YYYY"]).format("YYYY-MM-DD");
+
+  // 🔍 find data
+  const data = await DPSlip.findOne({
+    where: {
+      client_code: ClientCode,
+      from_date: { [Op.lte]: from },
+      to_date: { [Op.gte]: to }
+    }
+  });
+
+  // ❌ not found
+  if (!data) {
+    return {
+      success: false,
+      message: "Invalid Client Code",
+      result: {
+        all_Count: 0,
+        numberOfPages: 0,
+        rowsPerPage: 0,
+        FileData: null
+      }
+    };
+  }
+
+  // ✅ success
+  return {
+    success: true,
+    message: "File found",
+    result: {
+      all_Count: 1,
+      numberOfPages: 1,
+      rowsPerPage: 1,
+      FileData: {
+        ...data.toJSON(),
+        file_url: `http://localhost:5000/${data.file_url}` // 🔥 open file
+      }
+    }
+  };
+};
+
+const { ResearchCall } = require('../models');
+
+const getResearchCalls = async (searchType) => {
+  const rows = await ResearchCall.findAll({
+    where: {
+      call_type: searchType
+    },
+    order: [['call_date', 'DESC']]
+  });
+
+  return {
+    success: true,
+    message: rows.length ? null : "Data Not Found. ",
+    count: rows.length,
+    result: rows.map(item => ({
+      DateTime: item.call_date,
+      Segment: item.segment,
+      Message: item.message
+    }))
+  };
+};
+
+const { AlgoBrokerage } = require('../models');
+
+const getAlgoBrokerage = async (query) => {
+  const { pageNumber = 0, size = 50, datefrom, dateto } = query;
+
+  let where = {};
+
+  if (datefrom && dateto) {
+    const from = moment(datefrom, "DD-MM-YYYY").startOf('day').format("YYYY-MM-DD HH:mm:ss");
+    const to = moment(dateto, "DD-MM-YYYY").endOf('day').format("YYYY-MM-DD HH:mm:ss");
+    where.report_date = {
+      [Op.between]: [from, to]
+    };
+  }
+
+  const limit = parseInt(size, 10) || 50;
+  const offset = parseInt(pageNumber, 10) * limit || 0;
+
+  const { count, rows } = await AlgoBrokerage.findAndCountAll({
+    where,
+    limit,
+    offset,
+    order: [['report_date', 'DESC']]
+  });
+
+  return {
+    success: true,
+    message: count ? "Data fetched successfully" : "no record found",
+    result: {
+      all_Count: count,
+      numberOfPages: Math.ceil(count / limit),
+      rowsPerPage: limit,
+      AlgoBrokerageList: rows
+    }
+  };
+};
+
+const { MutualFund } = require('../models');
+
+const getMutualFundReport = async (query) => {
+  const {
+    apcode,
+    datefrm,
+    dateto,
+    pageNumber = 0,
+    size = 50
+  } = query;
+
+  let where = {};
+
+  // 🔍 Commission Account Filter
+  if (apcode) {
+    where.commission_account = apcode;
+  }
+
+  // 📅 Date Filter
+  if (datefrm && dateto) {
+    const from = moment(datefrm, "DD-MM-YYYY").format("YYYY-MM-DD");
+    const to = moment(dateto, "DD-MM-YYYY").format("YYYY-MM-DD");
+    where.date = {
+      [Op.between]: [from, to]
+    };
+  }
+
+  const { count, rows } = await MutualFund.findAndCountAll({
+    where,
+    limit: parseInt(size),
+    offset: parseInt(pageNumber * size),
+    order: [['date', 'DESC']]
+  });
+
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / size),
+    rowsPerPage: parseInt(size),
+    MfAdmin: rows
+  };
+};
+
+const { MutualFundRejection } = require('../models');
+
+const getMfRejectionReport = async (query) => {
+  let { datefrm, dateto, Search, pageNumber = 0, size = 50 } = query;
+
+  let where = {};
+
+  // 🔍 client code search
+  if (Search) {
+    where.client_code = Search;
+  }
+
+  // 📅 date filter
+  if (datefrm && dateto) {
+    const from = moment(datefrm, "DD-MM-YYYY").startOf("day").format("YYYY-MM-DD HH:mm:ss");
+    const to = moment(dateto, "DD-MM-YYYY").endOf("day").format("YYYY-MM-DD HH:mm:ss");
+
+    where.sip_date = {
+      [Op.between]: [from, to]
+    };
+  }
+
+  const { count, rows } = await MutualFundRejection.findAndCountAll({
+    where,
+    limit: parseInt(size),
+    offset: parseInt(pageNumber * size),
+    order: [['sip_date', 'DESC']]
+  });
+
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / size),
+    rowsPerPage: parseInt(size),
+    MfRejection: rows.length ? rows : []
+  };
+};
+
+const { MfMandateReport } = require('../models');
+
+const getMfMandateReport = async (query) => {
+  let { datefrm, dateto, Search, pageNumber = 0, size = 50 } = query;
+
+  let where = {};
+
+  // 🔍 client code search
+  if (Search) {
+    where.client_code = Search;
+  }
+
+  // 📅 date filter
+  if (datefrm && dateto) {
+    const from = moment(datefrm, "DD-MM-YYYY").startOf("day").format("YYYY-MM-DD HH:mm:ss");
+    const to = moment(dateto, "DD-MM-YYYY").endOf("day").format("YYYY-MM-DD HH:mm:ss");
+
+    where.mandate_date = {
+      [Op.between]: [from, to]
+    };
+  }
+
+  const { count, rows } = await MfMandateReport.findAndCountAll({
+    where,
+    limit: parseInt(size),
+    offset: parseInt(pageNumber * size),
+    order: [['mandate_date', 'DESC']]
+  });
+
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / size),
+    rowsPerPage: parseInt(size),
+    MfMandate: rows.length ? rows : null
+  };
+};
+
+const { BondOffer } = require('../models');
+
+const getBondOffers = async () => {
+  const data = await BondOffer.findAll({
+    order: [['id', 'DESC']]
+  });
+
+  return {
+    all_Count: data.length,
+    numberOfPages: 0,
+    rowsPerPage: 0,
+    current: 1,
+    total: data.length,
+    length: data.length,
+    offerlist: data
+  };
+};
+
+const { ContestData, InactiveClient, FollowUpCall, Payout } = require('../models');
+
+const getContestData = async (query) => {
+  let { pageNumber = 0, size = 50, Search } = query;
+
+  pageNumber = parseInt(pageNumber);
+  size = parseInt(size);
+
+  let where = {};
+
+  // 🔍 ONLY branch_code + client_code
+  if (Search) {
+    where = {
+      [Op.or]: [
+        { client_code: { [Op.like]: `%${Search}%` } },
+        { branch_code: { [Op.like]: `%${Search}%` } }
+      ]
+    };
+  }
+
+  const { count, rows } = await ContestData.findAndCountAll({
+    where,
+    limit: size,
+    offset: pageNumber * size,
+    order: [['id', 'DESC']]
+  });
+
+  return {
+    all_Count: count,
+    numberOfPages: Math.ceil(count / size),
+    rowsPerPage: size,
+    list: rows
+  };
+};
+
+const getInactiveClients = async (query) => {
+  const { pageNumber = 0, size = 50 } = query;
+
+  const { count, rows } = await InactiveClient.findAndCountAll({
+    limit: parseInt(size),
+    offset: parseInt(pageNumber * size)
+  });
+
+  return {
+    success: true,
+    message: "InActive Client Details",
+    result: {
+      all_Count: count,
+      numberOfPages: Math.ceil(count / size),
+      rowsPerPage: parseInt(size),
+      clientlist: rows.map(item => ({
+        ClientCode: item.client_code,
+        ClientName: item.client_name,
+        Mobile: item.mobile,
+        Email: item.email,
+        PanNumber: item.pan_number,
+        Whatsapp: item.whatsapp,
+        Remark: item.remark,
+        MobileApp: item.mobile_app,
+        Sip: item.sip
+      }))
+    }
+  };
+};
+
+const getFollowUpData = async (query) => {
+  const { pageNumber = 0, size = 50, ClientCode, CallDate } = query;
+
+  let where = {};
+
+  // ✅ client code filter
+  if (ClientCode) {
+    where.client_code = ClientCode;
+  }
+
+  // ✅ single date filter (DD-MM-YYYY → YYYY-MM-DD)
+  if (CallDate) {
+    const [day, month, year] = CallDate.split("-");
+    const formattedDate = `${year}-${month}-${day}`;
+    where.call_date = formattedDate;
+  }
+
+  const { count, rows } = await FollowUpCall.findAndCountAll({
+    where,
+    limit: parseInt(size),
+    offset: parseInt(pageNumber * size),
+    order: [['call_date', 'DESC']]
+  });
+
+  return {
+    success: true,
+    message: rows.length ? "Details!!" : "Data not found !!!",
+    result: {
+      all_Count: count,
+      numberOfPages: Math.ceil(count / size),
+      rowsPerPage: parseInt(size),
+      clientlist: rows.length ? rows.map(item => ({
+        ClientCode: item.client_code,
+        ClientName: item.client_name,
+        CallDate: item.call_date,
+        Message: item.message,
+        Remark: item.remark
+      })) : null
+    }
+  };
+};
+
+const getClientBalance = async (query) => {
+  const { pageNumber = 0, size = 50, clientcode } = query;
+
+  let where = {};
+
+  if (clientcode) {
+    where.client_code = {
+      [Op.like]: `%${clientcode}%`
+    };
+  }
+
+  const { count, rows } = await Payout.findAndCountAll({
+    where,
+    limit: parseInt(size),
+    offset: parseInt(pageNumber * size)
+  });
+
+  return {
+    success: rows.length ? true : false,
+    message: rows.length ? "Data fetched successfully" : "no record found",
+    result: {
+      all_Count: count,
+      numberOfPages: Math.ceil(count / size),
+      rowsPerPage: parseInt(size),
+      balancelist: rows.map(item => ({
+        ClientCode: item.client_code,
+        ClientName: item.client_name,
+        LedgerBalance: item.ledger_balance,
+        AvailableBalance: item.available_balance,
+        MarginBalance: item.margin_balance
+      }))
+    }
+  };
+};
+
 /**
  * ================= EXPORT =================
  */
 module.exports = {
+  getDPSlip,
+  getIPOReport,
+  getMTFReport,
   getHoldings,
   getHoldingsReport,
   getOpenPosition,
@@ -1074,5 +1728,21 @@ module.exports = {
   getModification,
   getPhysical,
   getNomineePending,
-  getComplianceCircular
+  getComplianceCircular,
+  getMarketingMaterial,
+  getDownloadFiles,
+  getCertificates,
+  uploadCertificate,
+  getMtfBalance,
+  getResearchCalls,
+  getAlgoBrokerage,
+  getMutualFundReport,
+  getMfRejectionReport,
+  getMfMandateReport,
+  getBondOffers,
+  getContestData,
+  getInactiveClients,
+  getFollowUpData,
+  getClientBalance
+
 };
