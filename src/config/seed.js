@@ -6,9 +6,25 @@ const seed = async () => {
     await sequelize.authenticate();
     console.log('✅ DB Connected. Starting seed...\n');
 
+    // Disable foreign key checks
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0;');
+    console.log('🔄 Foreign key checks disabled.');
+
+    // Drop all existing tables (including those not managed by Sequelize)
+    const [tables] = await sequelize.query('SHOW TABLES');
+    for (const table of tables) {
+      const tableName = Object.values(table)[0];
+      await sequelize.query(`DROP TABLE IF EXISTS \`${tableName}\`;`);
+      console.log(`🗑️  Dropped table: ${tableName}`);
+    }
+
     // Sync tables
     await sequelize.sync({ force: true });
-    console.log('✅ Tables dropped and recreated.\n');
+    console.log('✅ Tables managed by models synchronized.\n');
+
+    // Re-enable foreign key checks
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1;');
+    console.log('🔄 Foreign key checks re-enabled.');
 
     // ── Managers ───────────────────────────────────────────────────────────────
     await Manager.bulkCreate([
