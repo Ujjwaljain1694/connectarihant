@@ -8,7 +8,7 @@ const SamparkReport = sequelize.define('SamparkReport', {
     primaryKey: true
   },
   manager_id: {
-    type: DataTypes.STRING
+    type: DataTypes.STRING(9)
   },
   client_code: {
     type: DataTypes.STRING

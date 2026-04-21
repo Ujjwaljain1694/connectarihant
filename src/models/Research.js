@@ -8,7 +8,7 @@ const Research = sequelize.define('Research', {
     autoIncrement: true,
   },
   manager_id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING(9),
     allowNull: false,
   },
   date: {

@@ -8,7 +8,7 @@ const ThirdParty = sequelize.define('ThirdParty', {
     autoIncrement: true,
   },
   manager_id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING(9),
     allowNull: false,
   },
   date: {

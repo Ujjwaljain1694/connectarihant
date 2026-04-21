@@ -11,6 +11,10 @@ const Brokerage = sequelize.define('Brokerage', {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  manager_id: {
+    type: DataTypes.STRING(9),
+    allowNull: false,
+  },
   type: {
     type: DataTypes.ENUM('CAPITAL', 'DERIVATIVE', 'COMMODITY'),
     allowNull: false,

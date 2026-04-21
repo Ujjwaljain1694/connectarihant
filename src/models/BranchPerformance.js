@@ -8,7 +8,7 @@ const BranchPerformance = sequelize.define('BranchPerformance', {
     primaryKey: true
   },
   manager_id: {
-    type: DataTypes.STRING
+    type: DataTypes.STRING(9)
   },
   branch_code: {
     type: DataTypes.STRING
