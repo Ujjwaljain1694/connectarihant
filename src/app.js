@@ -70,7 +70,7 @@ require('./routes/payoutCancel.routes')(app);
 require('./routes/payoutReport.routes')(app);
 const otpRoutes = require('./routes/otp.routes');
 app.use('/api/payout', require('./routes/bulkPayout.routes'));
-app.use('/api/otp', otpRoutes);
+app.use('/api', otpRoutes);
 require('./routes/mfStructure.routes')(app);
 
 // ─── Static Route ─────────────────────────────────────────────────────────────
