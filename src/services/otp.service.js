@@ -2,7 +2,14 @@ const { OtpLog } = require("../models");
 
 // 🔹 SEND OTP
 const sendOtpService = async (body) => {
-  const { branchCode } = body;
+  const branchCode = body.branchCode || body.branch_code;
+
+  if (!branchCode) {
+    return {
+      success: false,
+      message: "branchCode is required!"
+    };
+  }
 
   const lastOtp = await OtpLog.findOne({
     where: { branch_code: branchCode },
@@ -41,7 +48,15 @@ const sendOtpService = async (body) => {
 
 // 🔹 VERIFY OTP
 const verifyOtpService = async (body) => {
-  const { branchCode, otp } = body;
+  const branchCode = body.branchCode || body.branch_code;
+  const { otp } = body;
+
+  if (!branchCode || !otp) {
+    return {
+      success: false,
+      message: "branchCode and otp are required!"
+    };
+  }
 
   const record = await OtpLog.findOne({
     where: {
@@ -77,7 +92,14 @@ const verifyOtpService = async (body) => {
 
 // 🔹 REVENUE DATA
 const getRevenueService = async (query) => {
-  const { branchCode } = query;
+  const branchCode = query.branchCode || query.branch_code;
+
+  if (!branchCode) {
+    return {
+      success: false,
+      message: "branchCode is required!"
+    };
+  }
 
   const verified = await OtpLog.findOne({
     where: {
