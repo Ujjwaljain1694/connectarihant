@@ -70,4 +70,6 @@ const PayoutReport = require('./payoutReport.model')(sequelize, DataTypes);
 const BulkPayout = require('./bulkPayout.model')(sequelize, DataTypes);
 const MfStructure = require('./mfStructure.model')(sequelize, DataTypes);
 
-module.exports = { sequelize, Manager, Client, Holding, Position, OTP, TrialBalance, Brokerage, ThirdParty, Research,  BranchPerformance ,ReactivationReport, SamparkReport, KRAStatus, HoldKRA, Modification, PhysicalAccount,  NomineePending, ComplianceCircular, MarketingMaterial, DownloadFile, Certificate, UploadCertificate, MtfBalance, MTFRequestReport, IPOReport, DPSlip, ResearchCall, AlgoBrokerage, MutualFund, MutualFundRejection, MfMandateReport, BondOffer, ContestData, InactiveClient, FollowUpCall, Payout, payout_cancel: PayoutCancel, payout_report: PayoutReport, bulk_payout: BulkPayout, mf_structure: MfStructure };
+const OtpLog = require('./OtpLog')(sequelize, DataTypes);
+
+module.exports = { sequelize, Manager, Client, Holding, Position, OTP, OtpLog, TrialBalance, Brokerage, ThirdParty, Research,  BranchPerformance ,ReactivationReport, SamparkReport, KRAStatus, HoldKRA, Modification, PhysicalAccount,  NomineePending, ComplianceCircular, MarketingMaterial, DownloadFile, Certificate, UploadCertificate, MtfBalance, MTFRequestReport, IPOReport, DPSlip, ResearchCall, AlgoBrokerage, MutualFund, MutualFundRejection, MfMandateReport, BondOffer, ContestData, InactiveClient, FollowUpCall, Payout, payout_cancel: PayoutCancel, payout_report: PayoutReport, bulk_payout: BulkPayout, mf_structure: MfStructure };
