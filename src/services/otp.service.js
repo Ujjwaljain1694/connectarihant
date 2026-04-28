@@ -2,6 +2,7 @@ const { OtpLog } = require("../models");
 
 // 🔹 SEND OTP
 const sendOtpService = async (body) => {
+  console.log("Received body in sendOtpService:", body);
   const branchCode = body.branchCode || body.branch_code;
 
   if (!branchCode) {
